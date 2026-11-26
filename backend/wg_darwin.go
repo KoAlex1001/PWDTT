@@ -47,7 +47,7 @@ type wgHelperMsg struct {
 // APP SIDE
 // ═══════════════════════════════════════════════════
 
-func (w *WG) applyDarwin(confText string, turnIPs []string, logf wgLogFunc) error {
+func (w *WG) applyDarwin(confText string, turnIPs []string, split SplitTunnel, domainRoutes []string, logf wgLogFunc) error {
 	w.teardownDarwin()
 
 	addr, mtuStr, allowedIPs, wgConf := parseWGConfig(confText)
@@ -59,6 +59,11 @@ func (w *WG) applyDarwin(confText string, turnIPs []string, logf wgLogFunc) erro
 		fmt.Sscanf(mtuStr, "%d", &mtu)
 	}
 
+	routeTunnels, splitExcludes := ResolveSplit(allowedIPs, split, domainRoutes...)
+	if summary := SplitSummary(split); summary != "" {
+		logf(summary)
+	}
+
 	// Exclude-маршруты — через физический gateway, мимо туннеля
 	var excludes []string
 	for _, ip := range turnIPs {
@@ -68,16 +73,21 @@ func (w *WG) applyDarwin(confText string, turnIPs []string, logf wgLogFunc) erro
 	for _, dns := range localDNSServers() {
 		excludes = append(excludes, dns+"/32")
 	}
+	// Раздельное туннелирование в режиме exclude: выбранные сети — мимо туннеля.
+	excludes = append(excludes, splitExcludes...)
 
 	// Туннельные маршруты: полный дефолт заменяем на split-default,
 	// чтобы не трогать физический default route
 	var tunnels []string
-	for _, cidr := range allowedIPs {
+	for _, cidr := range routeTunnels {
 		if cidr == "0.0.0.0/0" {
 			tunnels = append(tunnels, "0.0.0.0/1", "128.0.0.0/1")
 		} else {
 			tunnels = append(tunnels, cidr)
 		}
+	}
+	if split.Enabled && split.Mode == SplitModeInclude && len(tunnels) == 0 {
+		logf("Внимание: список раздельного туннелирования пуст — весь трафик пойдёт мимо туннеля")
 	}
 
 	// Сокет, на который выйдет helper

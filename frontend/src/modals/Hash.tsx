@@ -37,21 +37,24 @@ export default function Hash({ hashes, onClose, onSave }: Props) {
   return (
     <>
       <style>{`
-        .hash-overlay { position: fixed; inset: 0; background: var(--overlay-bg); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 200; animation: overlay-in 0.3s ease-out; }
-        .hash-modal { background: var(--surface); border-radius: 14px; padding: 20px; width: 380px; max-width: 95vw; box-shadow: var(--shadow); border: 1px solid var(--border); animation: modal-in 0.3s ease-out; }
-        .hash-header { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; color: var(--text); }
-        .hash-title { font-size: 16px; font-weight: 600; flex: 1; color: var(--text); }
-        .hash-close { background: none; border: none; cursor: pointer; font-size: 18px; color: var(--text); line-height: 1; padding: 0; }
-        .hash-input { width: 100%; padding: 11px 14px; border: 1.5px solid var(--input-border); border-radius: 10px; font-size: 14px; font-family: 'Geist', sans-serif; outline: none; margin-bottom: 10px; box-sizing: border-box; color: var(--text); background: var(--input-bg); }
+        .hash-overlay { position: fixed; inset: 0; background: var(--overlay-bg); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 200; animation: overlay-in 0.25s ease-out; }
+        .hash-modal { background: var(--surface); border-radius: 16px; padding: 18px; width: 360px; max-width: 95vw; box-shadow: var(--shadow); border: 1px solid var(--border); animation: modal-in 0.25s ease-out; }
+        .hash-header { display: flex; align-items: center; gap: 9px; margin-bottom: 14px; color: var(--text); }
+        .hash-title { font-size: 15px; font-weight: 600; flex: 1; color: var(--text); }
+        .hash-close { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; background: none; border: none; border-radius: 8px; cursor: pointer; color: var(--text-3); transition: background 0.15s, color 0.15s; }
+        .hash-close:hover { background: var(--bg-3); color: var(--text); }
+        .hash-input { width: 100%; padding: 9px 12px; border: 1px solid var(--input-border); border-radius: 9px; font-size: 13px; font-family: 'Geist', sans-serif; outline: none; margin-bottom: 8px; box-sizing: border-box; color: var(--text); background: var(--input-bg); transition: border-color 0.15s, box-shadow 0.15s; }
+        .hash-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
         .hash-input::placeholder { color: var(--text-4); }
-        .hash-btn { width: 100%; padding: 13px; border: none; border-radius: 10px; background: var(--accent); color: var(--accent-fg); font-size: 14px; font-family: 'Geist', sans-serif; font-weight: 600; cursor: pointer; margin-top: 4px; }
+        .hash-btn { width: 100%; padding: 10px; border: none; border-radius: 9px; background: var(--accent); color: var(--accent-fg); font-size: 13px; font-family: 'Geist', sans-serif; font-weight: 600; cursor: pointer; margin-top: 3px; transition: background 0.15s; }
+        .hash-btn:hover { background: var(--accent-hover); }
       `}</style>
       <div className="hash-overlay">
         <div className="hash-modal" onClick={e => e.stopPropagation()}>
           <div className="hash-header">
-            <IconHash stroke={2} size={22} />
+            <IconHash stroke={2} size={18} />
             <span className="hash-title">Hash</span>
-            <button type="button" className="hash-close" onClick={onClose} aria-label="Закрыть"><IconX size={18} /></button>
+            <button type="button" className="hash-close" onClick={onClose} aria-label="Закрыть"><IconX size={16} /></button>
           </div>
           {values.map((v, i) => (
             <input key={['hash-a', 'hash-b', 'hash-c', 'hash-d'][i]} className="hash-input" placeholder={`Hash - ${i + 1}`} value={v} onChange={e => set(i, e.target.value)} />

@@ -55,7 +55,7 @@ export default function Logs() {
 
   return (
     <>
-      <main className="logs-main">
+      <main className="logs-main panel">
         <div className="logs-card">
           <div className="logs-toolbar">
             <div className="search-wrap">

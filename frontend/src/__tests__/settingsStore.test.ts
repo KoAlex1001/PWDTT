@@ -22,11 +22,24 @@ describe('settingsStore', () => {
   });
 
   it('save → get: roundtrip', () => {
-    const custom = { autoStart: false, obfsMode: 'video' as const, obfsAccepted: true, turnTcp: false };
+    const custom = {
+      autoStart: false,
+      startMinimized: false,
+      obfsMode: 'video' as const,
+      obfsAccepted: true,
+      turnTcp: false,
+      splitTunnel: { enabled: true, mode: 'exclude' as const, routes: ['10.0.0.0/8'], domains: ['example.com'] },
+    };
     settingsStore.save(custom);
     
     // Перезагружаем "приложение" — должны восстановиться кастомные настройки
     expect(settingsStore.get()).toEqual(custom);
+  });
+
+  it('get: старый формат без startMinimized → запуск свёрнутым по умолчанию', () => {
+    localStorage.setItem('wdtt_settings:v1', JSON.stringify({ autoStart: false }));
+    const settings = settingsStore.get();
+    expect(settings.startMinimized).toBe(true);
   });
 
   it('должен мержить с дефолтами, если в localStorage неполные данные', () => {
@@ -40,9 +53,24 @@ describe('settingsStore', () => {
     expect(settings.turnTcp).toBe(DEFAULT_SETTINGS.turnTcp);
   });
 
+  it('get: старый формат без splitTunnel → дефолтные настройки', () => {
+    localStorage.setItem('wdtt_settings:v1', JSON.stringify({ autoStart: false }));
+    const settings = settingsStore.get();
+    expect(settings.splitTunnel).toEqual(DEFAULT_SETTINGS.splitTunnel);
+  });
+
+  it('get: частичный splitTunnel мержится с дефолтами', () => {
+    localStorage.setItem('wdtt_settings:v1', JSON.stringify({ splitTunnel: { enabled: true } }));
+    const settings = settingsStore.get();
+    expect(settings.splitTunnel.enabled).toBe(true);
+    expect(settings.splitTunnel.mode).toBe(DEFAULT_SETTINGS.splitTunnel.mode);
+    expect(settings.splitTunnel.routes).toEqual([]);
+    expect(settings.splitTunnel.domains).toEqual([]);
+  });
+
   it('должен сбрасывать obfsMode на audio, если obfsAccepted === false', () => {
-    settingsStore.save({ autoStart: false, obfsMode: 'audio', obfsAccepted: false, turnTcp: false });
-    settingsStore.save({ autoStart: true, obfsMode: 'video', obfsAccepted: true, turnTcp: false });
+    settingsStore.save({ autoStart: false, startMinimized: true, obfsMode: 'audio', obfsAccepted: false, turnTcp: false, splitTunnel: DEFAULT_SETTINGS.splitTunnel });
+    settingsStore.save({ autoStart: true, startMinimized: true, obfsMode: 'video', obfsAccepted: true, turnTcp: false, splitTunnel: DEFAULT_SETTINGS.splitTunnel });
 
     const settings = settingsStore.get();
     expect(settings.autoStart).toBe(true);
@@ -64,8 +92,8 @@ describe('settingsStore', () => {
   });
 
   it('save: перезаписывает предыдущие', () => {
-    settingsStore.save({ autoStart: false, obfsMode: 'audio', obfsAccepted: false, turnTcp: false });
-    settingsStore.save({ autoStart: true, obfsMode: 'video', obfsAccepted: true, turnTcp: false });
+    settingsStore.save({ autoStart: false, startMinimized: true, obfsMode: 'audio', obfsAccepted: false, turnTcp: false, splitTunnel: DEFAULT_SETTINGS.splitTunnel });
+    settingsStore.save({ autoStart: true, startMinimized: true, obfsMode: 'video', obfsAccepted: true, turnTcp: false, splitTunnel: DEFAULT_SETTINGS.splitTunnel });
 
     const settings = settingsStore.get();
     expect(settings.autoStart).toBe(true);

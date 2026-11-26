@@ -8,12 +8,12 @@ export default function Layout() {
   const { pathname } = useLocation();
 
   return (
-    <div style={{ display: 'flex', height: '100vh', background: 'var(--surface)', boxSizing: 'border-box' }}>
+    <div className="app-shell">
       <Sidebar
         onSettings={() => setSettingsOpen(true)}
         pathname={pathname}
       />
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div className="app-content">
         <Outlet />
       </div>
       {settingsOpen && <Settings onClose={() => setSettingsOpen(false)} />}

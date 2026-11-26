@@ -1,40 +1,59 @@
 .st-overlay { position: fixed; inset: 0; background: var(--overlay-bg); backdrop-filter: blur(4px); display: flex; align-items: center; justify-content: center; z-index: 100; animation: overlay-in 0.3s ease-out; }
-.st-modal { background: var(--surface); border-radius: 14px; padding: 20px; width: 380px; max-width: 95vw; box-shadow: var(--shadow); animation: modal-in 0.3s ease-out; border: 1px solid var(--border); }
-.st-header { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; color: var(--text); }
-.st-title { font-size: 16px; font-weight: 600; flex: 1; color: var(--text); }
-.st-close { background: none; border: none; cursor: pointer; font-size: 18px; color: var(--text); line-height: 1; padding: 0; }
-.st-row { display: flex; align-items: center; justify-content: space-between; padding: 11px 0; border-bottom: 1px solid var(--border-2); font-size: 14px; color: var(--text); }
+.st-modal { background: var(--surface); border-radius: 16px; padding: 18px; width: 392px; max-width: 95vw; max-height: calc(100vh - 32px); overflow-y: auto; box-shadow: var(--shadow); animation: modal-in 0.3s ease-out; border: 1px solid var(--border); }
+.st-header { display: flex; align-items: center; gap: 9px; margin-bottom: 14px; color: var(--text); }
+.st-title { font-size: 15px; font-weight: 600; flex: 1; color: var(--text); }
+.st-close { display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; background: none; border: none; border-radius: 8px; cursor: pointer; color: var(--text-3); transition: background 0.15s, color 0.15s; }
+.st-close:hover { background: var(--bg-3); color: var(--text); }
+.st-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--border-2); font-size: 13px; color: var(--text); }
 .st-row:last-of-type { border-bottom: none; }
-.st-badge { display: inline-block; font-size: 9px; font-weight: 700; color: var(--accent); background: var(--accent-dim, rgba(139,92,246,0.15)); padding: 1px 5px; border-radius: 4px; margin-left: 6px; vertical-align: middle; letter-spacing: 0.3px; }
-.st-segment { display: flex; gap: 4px; background: var(--seg-bg); border-radius: 8px; padding: 3px; }
-.st-seg-btn { padding: 5px 12px; border: none; border-radius: 6px; background: transparent; color: var(--text-3); font-size: 12px; font-family: 'Geist', sans-serif; font-weight: 600; cursor: pointer; transition: all 0.15s; }
-.st-seg-btn--active { background: var(--accent); color: var(--accent-fg); }
-.st-toggle { width: 48px; height: 26px; border-radius: 50px; border: none; cursor: pointer; position: relative; transition: background 0.2s, box-shadow 0.2s; flex-shrink: 0; }
-.st-toggle--on { background: var(--accent); box-shadow: 0 0 12px var(--accent-dim, rgba(139,92,246,0.3)); }
-.st-toggle--on:hover { box-shadow: 0 0 20px var(--accent-dim, rgba(139,92,246,0.5)); }
+.st-badge { display: inline-block; font-size: 9px; font-weight: 700; color: var(--accent); background: var(--accent-dim); padding: 1px 5px; border-radius: 4px; margin-left: 6px; vertical-align: middle; letter-spacing: 0.3px; }
+.st-row-note { font-size: 11px; color: var(--text-3); font-weight: 400; }
+.st-segment { display: flex; gap: 3px; background: var(--seg-bg); border-radius: 8px; padding: 3px; }
+.st-seg-btn { padding: 4px 11px; border: none; border-radius: 6px; background: transparent; color: var(--text-3); font-size: 11.5px; font-family: 'Geist', sans-serif; font-weight: 600; cursor: pointer; transition: background 0.15s, color 0.15s; }
+.st-seg-btn:hover { color: var(--text); }
+.st-seg-btn--active, .st-seg-btn--active:hover { background: var(--accent); color: var(--accent-fg); }
+.st-toggle { width: 42px; height: 24px; border-radius: 50px; border: none; cursor: pointer; position: relative; transition: background 0.2s, box-shadow 0.2s; flex-shrink: 0; }
+.st-toggle--on { background: var(--accent); box-shadow: 0 0 10px var(--accent-dim); }
+.st-toggle--on:hover { box-shadow: 0 0 16px var(--accent-dim); }
 .st-toggle--off { background: var(--seg-bg); }
-.st-toggle::after { content: ''; position: absolute; width: 18px; height: 18px; border-radius: 50%; top: 4px; transition: left 0.2s; }
-.st-toggle--on::after { background: var(--accent-fg); left: 26px; }
+.st-toggle::after { content: ''; position: absolute; width: 16px; height: 16px; border-radius: 50%; top: 4px; transition: left 0.2s; }
+.st-toggle--on::after { background: var(--accent-fg); left: 22px; }
 .st-toggle--off::after { background: var(--text-3); left: 4px; }
-.st-info { text-align: center; padding: 16px 0 4px; margin-top: 8px; }
-.st-info-name { font-size: 16px; font-weight: 700; color: var(--text); }
-.st-info-ver { font-size: 12px; color: var(--text-3); margin-top: 2px; }
-.st-actions { display: flex; gap: 8px; margin-top: 12px; }
-.st-action { flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px; padding: 9px 8px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); font-size: 12px; font-family: 'Geist', sans-serif; font-weight: 600; cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s, background 0.15s; white-space: nowrap; }
+.st-split-row { flex-direction: column; align-items: stretch; gap: 9px; }
+.st-split-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.st-split-body { display: flex; flex-direction: column; gap: 7px; }
+.st-split-mode { align-self: flex-start; }
+.st-split-label { font-size: 11px; font-weight: 600; color: var(--text-2); margin-bottom: -2px; }
+.st-split-presets { display: flex; flex-direction: column; gap: 5px; }
+.st-split-presets-label { font-size: 11px; color: var(--text-3); }
+.st-preset-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.st-preset { padding: 3px 9px; border: 1px solid var(--border); border-radius: 20px; background: var(--surface); color: var(--text-2); font-size: 11px; font-family: 'Geist', sans-serif; font-weight: 600; cursor: pointer; transition: border-color 0.15s, background 0.15s, color 0.15s; }
+.st-preset:hover { border-color: var(--accent); color: var(--text); }
+.st-preset--active { border-color: var(--accent); background: var(--accent); color: var(--accent-fg); }
+.st-split-input { width: 100%; box-sizing: border-box; resize: vertical; min-height: 74px; padding: 7px 9px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-2); color: var(--text); font-family: var(--mono); font-size: 11.5px; line-height: 1.5; outline: none; transition: border-color 0.15s, box-shadow 0.15s; }
+.st-split-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-dim); }
+.st-split-input::placeholder { color: var(--text-3); opacity: 0.7; }
+.st-split-error { font-size: 11px; color: var(--danger); line-height: 1.4; }
+.st-split-hint { font-size: 11px; color: var(--text-3); line-height: 1.45; }
+.st-info { text-align: center; padding: 12px 0 2px; margin-top: 6px; }
+.st-info-name { font-size: 14px; font-weight: 700; color: var(--text); }
+.st-info-ver { font-size: 11px; color: var(--text-3); margin-top: 1px; }
+.st-actions { display: flex; gap: 8px; margin-top: 10px; }
+.st-action { flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px; padding: 8px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--text); font-size: 12px; font-family: 'Geist', sans-serif; font-weight: 600; cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s, background 0.15s; white-space: nowrap; }
 .st-action:hover { border-color: var(--accent); background: var(--bg-2); }
-.st-action--copied { border-color: #22c55e; color: #22c55e; }
-.st-donate { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; margin-top: 8px; padding: 10px; border: 1.5px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); font-size: 13px; font-family: 'Geist', sans-serif; font-weight: 600; cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s; }
-.st-donate:hover { border-color: var(--accent); box-shadow: 0 0 16px var(--accent-dim, rgba(139,92,246,0.2)); }
+.st-action--copied { border-color: var(--ok); color: var(--ok); }
+.st-donate { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; margin-top: 7px; padding: 9px; border: 1.5px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--text); font-size: 12.5px; font-family: 'Geist', sans-serif; font-weight: 600; cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s; }
+.st-donate:hover { border-color: var(--accent); box-shadow: 0 0 14px var(--accent-dim); }
 
 /* Obfs modal */
-.st-obfs-modal { width: 340px; text-align: center; padding: 24px 20px 20px; }
-.st-obfs-icon { color: #f59e0b; margin-bottom: 12px; }
-.st-obfs-title { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 10px; }
-.st-obfs-text { font-size: 13px; color: var(--text-2); line-height: 1.5; margin-bottom: 8px; }
-.st-obfs-disclaimer { font-size: 11px; color: var(--text-3); font-style: italic; margin-bottom: 16px; }
+.st-obfs-modal { width: 340px; text-align: center; padding: 22px 18px 18px; }
+.st-obfs-icon { color: var(--warn); margin-bottom: 10px; }
+.st-obfs-title { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 9px; }
+.st-obfs-text { font-size: 12.5px; color: var(--text-2); line-height: 1.5; margin-bottom: 7px; }
+.st-obfs-disclaimer { font-size: 11px; color: var(--text-3); font-style: italic; margin-bottom: 14px; }
 .st-obfs-actions { display: flex; gap: 8px; }
-.st-obfs-btn { flex: 1; padding: 9px; border-radius: 8px; font-size: 13px; font-family: 'Geist', sans-serif; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+.st-obfs-btn { flex: 1; padding: 8px; border-radius: 8px; font-size: 12.5px; font-family: 'Geist', sans-serif; font-weight: 600; cursor: pointer; transition: all 0.15s; }
 .st-obfs-btn--cancel { background: var(--seg-bg); color: var(--text-3); border: 1px solid var(--border); }
 .st-obfs-btn--cancel:hover { border-color: var(--text-3); }
 .st-obfs-btn--accept { background: var(--accent); color: var(--accent-fg); border: none; }
-.st-obfs-btn--accept:hover { opacity: 0.9; }
+.st-obfs-btn--accept:hover { background: var(--accent-hover); }

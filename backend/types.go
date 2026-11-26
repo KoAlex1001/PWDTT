@@ -26,10 +26,27 @@ type ProfileData struct {
 	TurnTCP  bool     `json:"turn_tcp"`          // использовать TCP транспорт
 }
 
+// SplitTunnel — настройки раздельного туннелирования (split tunneling).
+// Работает по маршрутам: в туннель попадает только выбранная часть IPv4-сетей
+// (Mode=include) либо всё, кроме выбранной (Mode=exclude).
+type SplitTunnel struct {
+	Enabled bool     `json:"enabled"` // включено ли раздельное туннелирование
+	Mode    string   `json:"mode"`    // include (только список) / exclude (всё кроме списка)
+	Routes  []string `json:"routes"`  // IPv4-адреса и подсети (CIDR)
+	Domains []string `json:"domains"` // домены, резолвятся в IPv4 при подключении
+}
+
 // AppSettings — настройки приложения, хранятся в ~/.config/pwdtt/config.json.
 type AppSettings struct {
-	AutoStart    bool   `json:"autoStart"`    // автозапуск при старте системы
-	ObfsMode     string `json:"obfsMode"`     // audio/video
-	ObfsAccepted bool   `json:"obfsAccepted"` // пользователь принял предупреждение об обфускации
-	TurnTCP      bool   `json:"turnTcp"`      // использовать TCP транспорт
+	AutoStart    bool        `json:"autoStart"`    // автозапуск при старте системы
+	ObfsMode     string      `json:"obfsMode"`     // audio/video
+	ObfsAccepted bool        `json:"obfsAccepted"` // пользователь принял предупреждение об обфускации
+	TurnTCP      bool        `json:"turnTcp"`      // использовать TCP транспорт
+	SplitTunnel  SplitTunnel `json:"splitTunnel"`  // раздельное туннелирование
+	// StartMinimized — при автозапуске стартовать свёрнутым (Windows — в трей,
+	// Linux/macOS — в панель задач/Dock).
+	StartMinimized bool `json:"startMinimized"`
+	// LastProfile — имя последнего выбранного профиля. Нужно трею, чтобы
+	// подключаться из меню, когда окно скрыто.
+	LastProfile string `json:"lastProfile,omitempty"`
 }

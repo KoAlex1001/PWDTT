@@ -16,7 +16,7 @@ export default function UpdateModal({ version, body, url, onClose }: Props) {
     <>
       <style>{`
         .upd-overlay { position: fixed; inset: 0; background: var(--overlay-bg); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; z-index: 200; animation: overlay-in 0.25s ease-out; }
-        .upd-modal { background: var(--surface); border-radius: 16px; padding: 24px; width: 420px; max-width: 92vw; box-shadow: var(--shadow); animation: modal-in 0.3s ease-out; border: 1px solid var(--border); position: relative; overflow: hidden; }
+        .upd-modal { background: var(--surface); border-radius: 16px; padding: 20px; width: 400px; max-width: 92vw; box-shadow: var(--shadow); animation: modal-in 0.3s ease-out; border: 1px solid var(--border); position: relative; overflow: hidden; }
         .upd-modal::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; background: linear-gradient(90deg, var(--accent), #22c55e); }
         .upd-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
         .upd-icon { width: 40px; height: 40px; border-radius: 12px; background: rgba(34, 197, 94, 0.12); display: flex; align-items: center; justify-content: center; color: #22c55e; flex-shrink: 0; }

@@ -17,7 +17,7 @@ import { logStore } from '../lib/stores/logStore';
 import { wdttLinkStore } from '../lib/utils/wdttLink';
 import { SaveProfile } from '../../wailsjs/go/backend/App';
 import type { Server, TunnelState } from '../lib/types';
-import { Connect as WailsConnect, Disconnect as WailsDisconnect, ListProfiles } from '../../wailsjs/go/backend/App';
+import { Connect as WailsConnect, Disconnect as WailsDisconnect, ListProfiles, SetLastProfile } from '../../wailsjs/go/backend/App';
 import shapeLight from '../assets/shape-light.png';
 import shapeDark from '../assets/shape-dark.png';
 import powerIcon from '../assets/power-icon.png';
@@ -92,6 +92,13 @@ const TUNNEL_LABEL: Record<TunnelState, string> = {
   disconnecting: 'Отключение...',
 };
 
+const STATUS_LABEL: Record<TunnelState, string> = {
+  idle: 'Отключено',
+  connecting: 'Подключение…',
+  connected: 'Подключено',
+  disconnecting: 'Отключение…',
+};
+
 function PowerButton({ theme, tunnelState, isActive, isSpinning, linkFlash, selected, onTunnel }: {
   theme: string; tunnelState: TunnelState; isActive: boolean; isSpinning: boolean;
   linkFlash: boolean; selected: Server | null; onTunnel: () => void;
@@ -99,7 +106,7 @@ function PowerButton({ theme, tunnelState, isActive, isSpinning, linkFlash, sele
   return (
     <button
       type="button"
-      className="power-btn"
+      className={`power-btn${isActive ? ' power-btn--active' : ''}${isSpinning ? ' power-btn--busy' : ''}`}
       onClick={onTunnel}
       disabled={!selected}
       title={selected ? TUNNEL_LABEL[tunnelState] : 'Добавьте сервер'}
@@ -109,7 +116,7 @@ function PowerButton({ theme, tunnelState, isActive, isSpinning, linkFlash, sele
         <img src={theme === 'dark' ? shapeLight : shapeDark} alt="" draggable={false} />
       </div>
       <div className="power-icon">
-        <img src={powerIcon} alt="" draggable={false} style={{ width: 28, height: 35 }} />
+        <img src={powerIcon} alt="" draggable={false} />
       </div>
     </button>
   );
@@ -257,7 +264,10 @@ export default function Connect() {
 
   useEffect(() => {
     serverStore.setLastSelectedId(selected?.id ?? null);
-  }, [selected?.id]);
+    // Запоминаем профиль для трея: именно его подключает пункт меню,
+    // когда окно скрыто.
+    if (selected?.name) SetLastProfile(selected.name).catch(() => {});
+  }, [selected?.id, selected?.name]);
 
   const [addServerOpen, setAddServerOpen] = useState(false);
   const [editServer, setEditServer] = useState<Server | null>(null);
@@ -418,35 +428,53 @@ export default function Connect() {
 
   const isActive = tunnelState === 'connected';
   const isSpinning = tunnelState === 'connecting';
+  const dotState = !selected
+    ? 'off'
+    : tunnelState === 'connected'
+      ? 'connected'
+      : tunnelState === 'idle'
+        ? 'off'
+        : 'busy';
 
   return (
     <>
-      <main className="main">
-        <button type="button" className="btn-add" onClick={() => setAddServerOpen(true)} aria-label="Добавить сервер">
-          <IconPlus stroke={2} size={22} />
-        </button>
+      <main className="main panel">
+        <header className="topbar">
+          <div className="conn-status">
+            <span className={`status-dot status-dot--${dotState}`} />
+            <span className="conn-status-text">{selected ? STATUS_LABEL[tunnelState] : 'Сервер не выбран'}</span>
+          </div>
+          <button type="button" className="btn-add" onClick={() => setAddServerOpen(true)} aria-label="Добавить сервер" title="Добавить сервер">
+            <IconPlus stroke={2} size={18} />
+          </button>
+        </header>
 
-        <PowerButton
-          theme={theme}
-          tunnelState={tunnelState}
-          isActive={isActive}
-          isSpinning={isSpinning}
-          linkFlash={linkFlash}
-          selected={selected}
-          onTunnel={handleTunnel}
-        />
+        <section className="stage">
+          <PowerButton
+            theme={theme}
+            tunnelState={tunnelState}
+            isActive={isActive}
+            isSpinning={isSpinning}
+            linkFlash={linkFlash}
+            selected={selected}
+            onTunnel={handleTunnel}
+          />
+          <span className={`tunnel-pill tunnel-pill--${dotState}`}>
+            {selected ? TUNNEL_LABEL[tunnelState] : 'Нет серверов'}
+          </span>
+        </section>
 
-        <span className="tunnel-label">{selected ? TUNNEL_LABEL[tunnelState] : 'Нет серверов'}</span>
-
-        <ServerSelector
-          servers={servers}
-          selected={selected}
-          listOpen={listOpen}
-          onToggleList={() => setListOpen(o => !o)}
-          onSelect={(s) => { setSelected({ ...s }); setListOpen(false); }}
-          onIconClick={handleIconClick}
-          onEdit={(s) => setEditServer(s)}
-        />
+        <footer className="connect-footer">
+          <ServerSelector
+            servers={servers}
+            selected={selected}
+            listOpen={listOpen}
+            onToggleList={() => setListOpen(o => !o)}
+            onSelect={(s) => { setSelected({ ...s }); setListOpen(false); }}
+            onIconClick={handleIconClick}
+            onEdit={(s) => setEditServer(s)}
+          />
+        </footer>
 
         {addServerOpen && <AddServer onClose={() => setAddServerOpen(false)} onAdd={handleAdd} />}
         {editServer && (

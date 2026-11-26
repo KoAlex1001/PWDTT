@@ -52,17 +52,17 @@ type WG struct {
 
 type wgLogFunc func(msg string)
 
-func (w *WG) Apply(conf string, turnIPs []string, logf wgLogFunc) error {
+func (w *WG) Apply(conf string, turnIPs []string, split SplitTunnel, domainRoutes []string, logf wgLogFunc) error {
 	if logf == nil {
 		logf = func(msg string) { log.Printf("[WG] %s", msg) }
 	}
 	switch runtime.GOOS {
 	case "linux":
-		return w.applyLinux(conf, turnIPs, logf)
+		return w.applyLinux(conf, turnIPs, split, domainRoutes, logf)
 	case "windows":
-		return w.applyWindows(conf, turnIPs, logf)
+		return w.applyWindows(conf, turnIPs, split, domainRoutes, logf)
 	case "darwin":
-		return w.applyDarwin(conf, turnIPs, logf)
+		return w.applyDarwin(conf, turnIPs, split, domainRoutes, logf)
 	default:
 		return fmt.Errorf("unsupported platform: %s", runtime.GOOS)
 	}
@@ -148,12 +148,17 @@ func parseWGConfig(conf string) (addr, mtu string, allowedIPs []string, wgConf s
 // LINUX — ip/wg команды через sudo
 // ═══════════════════════════════════════════════════
 
-func (w *WG) applyLinux(conf string, turnIPs []string, logf wgLogFunc) error {
+func (w *WG) applyLinux(conf string, turnIPs []string, split SplitTunnel, domainRoutes []string, logf wgLogFunc) error {
 	w.teardownLinux()
 
 	addr, mtu, allowedIPs, wgConf := parseWGConfig(conf)
 	if addr == "" {
 		return fmt.Errorf("Address not found in wg config")
+	}
+
+	tunnels, splitExcludes := ResolveSplit(allowedIPs, split, domainRoutes...)
+	if summary := SplitSummary(split); summary != "" {
+		logf(summary)
 	}
 
 	tmp, err := os.CreateTemp("", "wg-turn-*.conf")
@@ -190,23 +195,29 @@ func (w *WG) applyLinux(conf string, turnIPs []string, logf wgLogFunc) error {
 	var routes []string
 	gw := defaultGatewayLinux()
 	if gw != "" {
-		for _, ip := range turnIPs {
-			if runCmdLinux("ip", "route", "add", ip+"/32", "via", gw) == nil {
-				routes = append(routes, ip+"/32")
-			}
+		excludes := append([]string{}, turnIPs...)
+		for i, ip := range excludes {
+			excludes[i] = ip + "/32"
 		}
-		for _, cidr := range vkExcludeCIDRs {
+		excludes = append(excludes, vkExcludeCIDRs...)
+		for _, dns := range localDNSServers() {
+			excludes = append(excludes, dns+"/32")
+		}
+		// Раздельное туннелирование в режиме exclude: выбранные сети — мимо туннеля.
+		excludes = append(excludes, splitExcludes...)
+
+		for _, cidr := range excludes {
 			if runCmdLinux("ip", "route", "add", cidr, "via", gw) == nil {
 				routes = append(routes, cidr)
 			}
 		}
-		for _, dns := range localDNSServers() {
-			if runCmdLinux("ip", "route", "add", dns+"/32", "via", gw) == nil {
-				routes = append(routes, dns+"/32")
-			}
-		}
+	} else if len(splitExcludes) > 0 {
+		logf("Не удалось определить шлюз — исключения раздельного туннелирования не добавлены")
 	}
-	for _, cidr := range allowedIPs {
+	if split.Enabled && split.Mode == SplitModeInclude && len(tunnels) == 0 {
+		logf("Внимание: в туннель не попало ни одной сети — весь трафик пойдёт мимо туннеля")
+	}
+	for _, cidr := range tunnels {
 		if runCmdLinux("ip", "route", "add", cidr, "dev", wgIface) == nil {
 			routes = append(routes, "dev:"+cidr)
 		}
@@ -287,7 +298,7 @@ var wintunDLLData []byte
 // InitWintun устанавливает wintun.dll (вызывается из main_windows.go).
 func InitWintun(dll []byte) { wintunDLLData = dll }
 
-func (w *WG) applyWindows(conf string, turnIPs []string, logf wgLogFunc) error {
+func (w *WG) applyWindows(conf string, turnIPs []string, split SplitTunnel, domainRoutes []string, logf wgLogFunc) error {
 	w.stateMu.Lock()
 	defer w.stateMu.Unlock()
 	w.teardownWindowsLocked()
@@ -299,6 +310,11 @@ func (w *WG) applyWindows(conf string, turnIPs []string, logf wgLogFunc) error {
 	addr, mtuStr, allowedIPs, wgConf := parseWGConfig(conf)
 	if addr == "" {
 		return fmt.Errorf("Address not found in wg config")
+	}
+
+	tunnels, splitExcludes := ResolveSplit(allowedIPs, split, domainRoutes...)
+	if summary := SplitSummary(split); summary != "" {
+		logf(summary)
 	}
 
 	mtu := 1300
@@ -363,6 +379,8 @@ func (w *WG) applyWindows(conf string, turnIPs []string, logf wgLogFunc) error {
 			excludes = append(excludes, ip+"/32")
 		}
 		excludes = append(excludes, vkExcludeCIDRs...)
+		// Раздельное туннелирование в режиме exclude: выбранные сети — мимо туннеля.
+		excludes = append(excludes, splitExcludes...)
 		for _, cidr := range excludes {
 			ip, mask, err := parseCIDR(cidr)
 			if err != nil {
@@ -370,12 +388,18 @@ func (w *WG) applyWindows(conf string, turnIPs []string, logf wgLogFunc) error {
 			}
 			_ = runCmdWindows("route", "add", ip, "mask", mask, gw)
 		}
+	} else if len(splitExcludes) > 0 {
+		logf("Не удалось определить шлюз — исключения раздельного туннелирования не добавлены")
 	}
 	w.activeExcludeRoutes = excludes
 
-	// Add AllowedIPs routes via the WG interface
+	if split.Enabled && split.Mode == SplitModeInclude && len(tunnels) == 0 {
+		logf("Внимание: в туннель не попало ни одной сети — весь трафик пойдёт мимо туннеля")
+	}
+
+	// Add routes via the WG interface (AllowedIPs или список split tunneling)
 	var tunnelRoutes []string
-	for _, cidr := range allowedIPs {
+	for _, cidr := range tunnels {
 		if err := runCmdWindows("netsh", "interface", "ip", "add", "route", cidr, wgIface); err != nil {
 			logf(fmt.Sprintf("netsh add route %s failed: %v", cidr, err))
 		}

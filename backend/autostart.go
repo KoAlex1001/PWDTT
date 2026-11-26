@@ -11,14 +11,18 @@ import (
 
 const runKey = `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`
 
-func setAutoStart(v bool) error {
+// minimizedFlag — аргумент командной строки, с которым приложение стартует
+// свёрнутым (Windows — в трей, Linux/macOS — в панель задач/Dock).
+const minimizedFlag = "--minimized"
+
+func setAutoStart(v, minimized bool) error {
 	switch runtime.GOOS {
 	case "linux":
-		return setAutoStartLinux(v)
+		return setAutoStartLinux(v, minimized)
 	case "windows":
-		return setAutoStartWindows(v)
+		return setAutoStartWindows(v, minimized)
 	case "darwin":
-		return setAutoStartDarwin(v)
+		return setAutoStartDarwin(v, minimized)
 	default:
 		return fmt.Errorf("unsupported: %s", runtime.GOOS)
 	}
@@ -26,7 +30,7 @@ func setAutoStart(v bool) error {
 
 const launchAgentLabel = "com.pwdtt.autostart"
 
-func setAutoStartDarwin(v bool) error {
+func setAutoStartDarwin(v, minimized bool) error {
 	dir := filepath.Join(os.Getenv("HOME"), "Library", "LaunchAgents")
 	path := filepath.Join(dir, launchAgentLabel+".plist")
 	if !v {
@@ -46,6 +50,16 @@ func setAutoStartDarwin(v bool) error {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
+
+	args := []string{"/usr/bin/open", appPath}
+	if minimized {
+		args = append(args, "--args", minimizedFlag)
+	}
+	var argsXML strings.Builder
+	for _, a := range args {
+		fmt.Fprintf(&argsXML, "\t\t<string>%s</string>\n", a)
+	}
+
 	content := fmt.Sprintf(`<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -54,18 +68,16 @@ func setAutoStartDarwin(v bool) error {
 	<string>%s</string>
 	<key>ProgramArguments</key>
 	<array>
-		<string>/usr/bin/open</string>
-		<string>%s</string>
-	</array>
+%s	</array>
 	<key>RunAtLoad</key>
 	<true/>
 </dict>
 </plist>
-`, launchAgentLabel, appPath)
+`, launchAgentLabel, argsXML.String())
 	return os.WriteFile(path, []byte(content), 0o644)
 }
 
-func setAutoStartLinux(v bool) error {
+func setAutoStartLinux(v, minimized bool) error {
 	execPath, err := os.Executable()
 	if err != nil {
 		return err
@@ -77,18 +89,22 @@ func setAutoStartLinux(v bool) error {
 		return nil
 	}
 	os.MkdirAll(dir, 0o755)
-	content := fmt.Sprintf("[Desktop Entry]\nType=Application\nName=PWDTT\nExec=%s\nX-GNOME-Autostart-enabled=true\n", execPath)
+	execLine := execPath
+	if minimized {
+		execLine += " " + minimizedFlag
+	}
+	content := fmt.Sprintf("[Desktop Entry]\nType=Application\nName=PWDTT\nExec=%s\nX-GNOME-Autostart-enabled=true\n", execLine)
 	return os.WriteFile(path, []byte(content), 0o644)
 }
 
-func setAutoStartWindows(v bool) error {
+func setAutoStartWindows(v, minimized bool) error {
 	exe, err := os.Executable()
 	if err != nil {
 		return err
 	}
-	
+
 	taskName := "PWDTT_AutoStart"
-	
+
 	if !v {
 		// Remove scheduled task
 		cmd := exec.Command("schtasks", "/delete", "/tn", taskName, "/f")
@@ -99,10 +115,15 @@ func setAutoStartWindows(v bool) error {
 		}
 		return nil
 	}
-	
+
+	target := fmt.Sprintf("\"%s\"", exe)
+	if minimized {
+		target += " " + minimizedFlag
+	}
+
 	// Create scheduled task to run on user logon with highest privileges (admin)
 	// This prevents the UAC prompt on every system startup.
-	cmd := exec.Command("schtasks", "/create", "/tn", taskName, "/tr", fmt.Sprintf("\"%s\"", exe), "/sc", "onlogon", "/rl", "HIGHEST", "/f")
+	cmd := exec.Command("schtasks", "/create", "/tn", taskName, "/tr", target, "/sc", "onlogon", "/rl", "HIGHEST", "/f")
 	hideWindow(cmd)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -113,5 +134,5 @@ func setAutoStartWindows(v bool) error {
 
 // SetAutoStartLinux — exported wrapper for testing.
 func SetAutoStartLinux(v bool) error {
-	return setAutoStartLinux(v)
+	return setAutoStartLinux(v, false)
 }

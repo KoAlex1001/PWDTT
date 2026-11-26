@@ -44,7 +44,12 @@ func NewStore() *Store {
 // Если файла нет — возвращает дефолтные настройки.
 // Если obfsAccepted = false — obfsMode принудительно 'audio'.
 func (s *Store) LoadSettings() AppSettings {
-	defaults := AppSettings{AutoStart: true, ObfsMode: "audio", ObfsAccepted: false}
+	defaults := AppSettings{
+		AutoStart:      true,
+		ObfsMode:       "audio",
+		SplitTunnel:    SplitTunnel{Mode: SplitModeInclude},
+		StartMinimized: true,
+	}
 	data, err := os.ReadFile(filepath.Join(s.baseDir, "config.json"))
 	if err != nil {
 		return defaults
@@ -55,6 +60,17 @@ func (s *Store) LoadSettings() AppSettings {
 	}
 	if !settings.ObfsAccepted {
 		settings.ObfsMode = "audio"
+	}
+	if settings.SplitTunnel.Mode != SplitModeExclude {
+		settings.SplitTunnel.Mode = SplitModeInclude
+	}
+	// В конфигах старых версий поля startMinimized нет — для них включаем
+	// запуск в свёрнутом режиме по умолчанию.
+	var raw map[string]json.RawMessage
+	if json.Unmarshal(data, &raw) == nil {
+		if _, ok := raw["startMinimized"]; !ok {
+			settings.StartMinimized = true
+		}
 	}
 	return settings
 }
@@ -253,7 +269,10 @@ func atomicWrite(path string, data []byte) error {
 // NewTestStore создаёт Store с временной директорией (для тестов).
 // Подменяет HOME и, на Windows, AppData — os.UserConfigDir() читает именно их,
 // иначе тесты пишут в реальный конфиг пользователя.
-func NewTestStore(t interface{ TempDir() string; Setenv(string, string) }) *Store {
+func NewTestStore(t interface {
+	TempDir() string
+	Setenv(string, string)
+}) *Store {
 	dir := t.TempDir()
 	t.Setenv("HOME", dir)
 	t.Setenv("AppData", filepath.Join(dir, "AppData", "Roaming"))

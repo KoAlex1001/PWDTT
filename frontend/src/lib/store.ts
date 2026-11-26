@@ -39,7 +39,16 @@ export const serverStore = {
 export const settingsStore = {
   get: (): AppSettings => {
     const saved = parse<Partial<AppSettings>>(SETTINGS_KEY, {});
-    const merged = { ...DEFAULT_SETTINGS, ...saved };
+    const merged: AppSettings = {
+      ...DEFAULT_SETTINGS,
+      ...saved,
+      splitTunnel: {
+        ...DEFAULT_SETTINGS.splitTunnel,
+        ...(saved.splitTunnel ?? {}),
+        routes: saved.splitTunnel?.routes ?? DEFAULT_SETTINGS.splitTunnel.routes,
+        domains: saved.splitTunnel?.domains ?? DEFAULT_SETTINGS.splitTunnel.domains,
+      },
+    };
     if (!merged.obfsAccepted) merged.obfsMode = 'audio';
     return merged;
   },

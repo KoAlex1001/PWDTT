@@ -41,6 +41,9 @@ func TestLoadSettings_FileNotExists(t *testing.T) {
 	if !settings.AutoStart {
 		t.Error("expected AutoStart=true by default")
 	}
+	if !settings.StartMinimized {
+		t.Error("expected StartMinimized=true by default")
+	}
 	if settings.ObfsMode != "audio" {
 		t.Errorf("expected ObfsMode=audio by default, got %q", settings.ObfsMode)
 	}
@@ -87,6 +90,23 @@ func TestLoadSettings_EmptyFile(t *testing.T) {
 	settings := s.LoadSettings()
 	if !settings.AutoStart {
 		t.Error("expected default AutoStart on empty file")
+	}
+}
+
+func TestLoadSettings_StartMinimizedMigration(t *testing.T) {
+	s := newTestStore(t)
+	path := filepath.Join(pwdttDir(t), "config.json")
+
+	// Старый конфиг без поля startMinimized — включаем свёрнутый запуск.
+	os.WriteFile(path, []byte(`{"autoStart":true,"obfsAccepted":true}`), 0o644)
+	if !s.LoadSettings().StartMinimized {
+		t.Error("expected StartMinimized=true for legacy config")
+	}
+
+	// Явно выключенный пользователем режим должен сохраняться.
+	os.WriteFile(path, []byte(`{"autoStart":true,"obfsAccepted":true,"startMinimized":false}`), 0o644)
+	if s.LoadSettings().StartMinimized {
+		t.Error("expected StartMinimized=false when explicitly disabled")
 	}
 }
 

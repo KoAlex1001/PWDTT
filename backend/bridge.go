@@ -4,7 +4,9 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"sort"
 	"sync"
+	"time"
 
 	core "wg-turn-client"
 )
@@ -75,7 +77,7 @@ func (b *Bridge) Connect(params ConnectParams) error {
 	}
 
 	c := core.New(cfg)
-	
+
 	b.mu.Lock()
 	b.core = c
 	b.logFile = b.store.OpenLogFile()
@@ -129,6 +131,36 @@ func (b *Bridge) SendCaptchaResult(token string) {
 	}
 }
 
+// resolveSplitDomains резолвит домены из настроек split tunneling в IPv4 /32.
+// Ошибки по отдельным именам не фатальны: они пишутся в лог, а подключение
+// продолжается с остальными маршрутами. Резолв идёт до установки маршрутов,
+// поэтому используется обычный (физический) DNS.
+func (b *Bridge) resolveSplitDomains(split SplitTunnel, logf wgLogFunc) []string {
+	if !split.Enabled || len(split.Domains) == 0 {
+		return nil
+	}
+	base := b.ctx
+	if base == nil {
+		base = context.Background()
+	}
+	ctx, cancel := context.WithTimeout(base, 10*time.Second)
+	defer cancel()
+
+	resolved, errs := ResolveSplitDomains(ctx, split.Domains, nil)
+	failed := make([]string, 0, len(errs))
+	for domain := range errs {
+		failed = append(failed, domain)
+	}
+	sort.Strings(failed)
+	for _, domain := range failed {
+		logf(fmt.Sprintf("Домен %s не разрешён: %v", domain, errs[domain]))
+	}
+	if len(resolved) > 0 {
+		logf(fmt.Sprintf("Домены: %d IPv4-адресов", len(resolved)))
+	}
+	return resolved
+}
+
 // forwardEvents читает канал событий ядра и пробрасывает в Wails.
 // sessID — поколение сессии, на которую запущен этот горутин: если к моменту
 // его завершения уже начата новая сессия (быстрый Disconnect → Connect),
@@ -180,7 +212,12 @@ func (b *Bridge) forwardEvents(events <-chan core.Event, sessID uint64) {
 					}
 					b.mu.Unlock()
 				}
-				if err := wg.Apply(ev.Data, ev.TurnIPs, wgLogf); err != nil {
+				split, splitErr := NormalizeSplitTunnel(b.store.LoadSettings().SplitTunnel)
+				if splitErr != nil {
+					wgLogf("Настройки раздельного туннелирования: " + splitErr.Error())
+				}
+				domainRoutes := b.resolveSplitDomains(split, wgLogf)
+				if err := wg.Apply(ev.Data, ev.TurnIPs, split, domainRoutes, wgLogf); err != nil {
 					b.onEvent("error", fmt.Sprintf("[WG] Ошибка: %v", err))
 				} else {
 					b.onEvent("log", "INFO", "[WG] Конфиг применён, туннель активен")

@@ -21,6 +21,10 @@ export function GetObfsMode():Promise<string>;
 
 export function GetProfile(arg1:string):Promise<backend.ProfileData>;
 
+export function GetSplitTunnel():Promise<backend.SplitTunnel>;
+
+export function GetStartMinimized():Promise<boolean>;
+
 export function GetVersion():Promise<string>;
 
 export function IsRunning():Promise<boolean>;
@@ -31,10 +35,18 @@ export function SaveProfile(arg1:string,arg2:backend.ProfileData):Promise<void>;
 
 export function SetAutoStart(arg1:boolean):Promise<void>;
 
+export function SetLastProfile(arg1:string):Promise<void>;
+
 export function SetObfsAccepted(arg1:boolean):Promise<void>;
 
 export function SetObfsMode(arg1:string):Promise<void>;
 
+export function SetSplitTunnel(arg1:backend.SplitTunnel):Promise<backend.SplitTunnel>;
+
+export function SetStartMinimized(arg1:boolean):Promise<void>;
+
 export function Shutdown(arg1:context.Context):Promise<void>;
 
 export function Startup(arg1:context.Context):Promise<void>;
+
+export function ToggleTunnel():Promise<void>;

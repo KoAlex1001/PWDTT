@@ -38,6 +38,14 @@ export function GetProfile(arg1) {
   return window['go']['backend']['App']['GetProfile'](arg1);
 }
 
+export function GetSplitTunnel() {
+  return window['go']['backend']['App']['GetSplitTunnel']();
+}
+
+export function GetStartMinimized() {
+  return window['go']['backend']['App']['GetStartMinimized']();
+}
+
 export function GetVersion() {
   return window['go']['backend']['App']['GetVersion']();
 }
@@ -58,6 +66,10 @@ export function SetAutoStart(arg1) {
   return window['go']['backend']['App']['SetAutoStart'](arg1);
 }
 
+export function SetLastProfile(arg1) {
+  return window['go']['backend']['App']['SetLastProfile'](arg1);
+}
+
 export function SetObfsAccepted(arg1) {
   return window['go']['backend']['App']['SetObfsAccepted'](arg1);
 }
@@ -66,10 +78,22 @@ export function SetObfsMode(arg1) {
   return window['go']['backend']['App']['SetObfsMode'](arg1);
 }
 
+export function SetSplitTunnel(arg1) {
+  return window['go']['backend']['App']['SetSplitTunnel'](arg1);
+}
+
+export function SetStartMinimized(arg1) {
+  return window['go']['backend']['App']['SetStartMinimized'](arg1);
+}
+
 export function Shutdown(arg1) {
   return window['go']['backend']['App']['Shutdown'](arg1);
 }
 
 export function Startup(arg1) {
   return window['go']['backend']['App']['Startup'](arg1);
+}
+
+export function ToggleTunnel() {
+  return window['go']['backend']['App']['ToggleTunnel']();
 }

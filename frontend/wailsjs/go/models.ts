@@ -74,6 +74,24 @@ export namespace backend {
 	        this.turn_tcp = source["turn_tcp"];
 	    }
 	}
+	export class SplitTunnel {
+	    enabled: boolean;
+	    mode: string;
+	    routes: string[];
+	    domains: string[];
+	
+	    static createFrom(source: any = {}) {
+	        return new SplitTunnel(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.enabled = source["enabled"];
+	        this.mode = source["mode"];
+	        this.routes = source["routes"];
+	        this.domains = source["domains"];
+	    }
+	}
 	export class UpdateInfo {
 	    available: boolean;
 	    version: string;
