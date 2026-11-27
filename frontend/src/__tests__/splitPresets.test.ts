@@ -19,7 +19,7 @@ describe('SPLIT_PRESETS', () => {
     const expected: Record<string, string> = {
       instagram: '157.240.0.0/17',
       youtube: '142.250.0.0/15',
-      telegram: '91.108.0.0/20',
+      telegram: '91.108.20.0/22',
       ai: 'chatgpt.com',
       rutracker: 'rutracker.org',
     };
@@ -28,6 +28,27 @@ describe('SPLIT_PRESETS', () => {
       expect(preset, id).toBeDefined();
       expect([...preset!.routes, ...(preset!.domains ?? [])], id).toContain(entry);
     }
+  });
+
+  it('пресет Telegram покрывает официальные подсети и CDN медиа', () => {
+    const telegram = SPLIT_PRESETS.find(p => p.id === 'telegram')!;
+    // https://core.telegram.org/resources/cidr.txt (IPv4) + AS44907 (CDN).
+    const official = [
+      '91.105.192.0/23',
+      '91.108.4.0/22',
+      '91.108.8.0/22',
+      '91.108.12.0/22',
+      '91.108.16.0/22',
+      '91.108.20.0/22',
+      '91.108.56.0/22',
+      '95.161.64.0/20',
+      '149.154.160.0/20',
+      '185.76.151.0/24',
+    ];
+    for (const route of official) {
+      expect(telegram.routes, route).toContain(route);
+    }
+    expect(telegram.domains).toContain('cdn.telegram.org');
   });
 
   it('id и названия пресетов уникальны', () => {
