@@ -4,7 +4,23 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 )
+
+func TestCaptchaLockoutRemaining(t *testing.T) {
+	defer globalCaptchaLockout.Store(0)
+
+	globalCaptchaLockout.Store(time.Now().Add(captchaLockoutDuration).Unix())
+	remaining := captchaLockoutRemaining()
+	if remaining <= 0 || remaining > captchaLockoutDuration {
+		t.Errorf("captchaLockoutRemaining() = %v, want (0, %v]", remaining, captchaLockoutDuration)
+	}
+
+	globalCaptchaLockout.Store(time.Now().Add(-time.Second).Unix())
+	if got := captchaLockoutRemaining(); got != 0 {
+		t.Errorf("expired lockout: got %v, want 0", got)
+	}
+}
 
 func TestShouldRetryVKCallsOutdatedToken(t *testing.T) {
 	outdated := fmt.Errorf("error.webrtc.auth.anonym_token.outdated")

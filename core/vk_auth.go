@@ -284,7 +284,22 @@ const (
 	captchaAutoWebViewTimeout     = 10 * time.Second
 	captchaManualWebViewTimeout   = 60 * time.Second
 	captchaSelectedWebViewTimeout = 120 * time.Second
+	captchaLockoutDuration        = 60 * time.Second
 )
+
+// captchaLockoutRemaining возвращает, сколько ещё ждать до окончания
+// глобального лок CAPTCHA. Возвращает 0, если лок не активен.
+func captchaLockoutRemaining() time.Duration {
+	until := globalCaptchaLockout.Load()
+	if until <= 0 {
+		return 0
+	}
+	remaining := time.Until(time.Unix(until, 0))
+	if remaining <= 0 {
+		return 0
+	}
+	return remaining
+}
 
 func vkDelayRandom(minMs, maxMs int) {
 	ms := minMs + rand.Intn(maxMs-minMs+1)
@@ -335,6 +350,17 @@ var (
 )
 
 func fetchVkCredsSerialized(ctx context.Context, link string, streamID int) (string, string, []string, error) {
+	// Не дёргаем VK, пока активен глобальный лок после неудачной CAPTCHA:
+	// раньше каждый поток получал CAPTCHA_WAIT_REQUIRED каждые 5 секунд.
+	if remaining := captchaLockoutRemaining(); remaining > 0 {
+		log.Printf("[STREAM %d] [VK Auth] Глобальный лок CAPTCHA: ждём %v", streamID, remaining.Truncate(time.Second))
+		select {
+		case <-ctx.Done():
+			return "", "", nil, ctx.Err()
+		case <-time.After(remaining + time.Second):
+		}
+	}
+
 	vkRequestMu.Lock()
 	defer vkRequestMu.Unlock()
 
@@ -553,14 +579,14 @@ func getTokenChain(ctx context.Context, link string, streamID int, creds VKCrede
 			if captchaErr != nil && captchaErr.RedirectURI != "" && captchaErr.SessionToken != "" {
 				if attempt >= 3 {
 					log.Printf("[STREAM %d] [Captcha] Max attempts reached", streamID)
-					globalCaptchaLockout.Store(time.Now().Add(60 * time.Second).Unix())
+					globalCaptchaLockout.Store(time.Now().Add(captchaLockoutDuration).Unix())
 					return "", "", nil, fmt.Errorf("CAPTCHA_WAIT_REQUIRED")
 				}
 
 				successToken, solveErr := solveCaptchaBySelectedMode(ctx, streamID, attempt+1, captchaErr, client, profile, savedProfile)
 				if solveErr != nil {
 					log.Printf("[STREAM %d] [Captcha] Solve failed: %v", streamID, solveErr)
-					globalCaptchaLockout.Store(time.Now().Add(60 * time.Second).Unix())
+					globalCaptchaLockout.Store(time.Now().Add(captchaLockoutDuration).Unix())
 					return "", "", nil, fmt.Errorf("CAPTCHA_WAIT_REQUIRED")
 				}
 

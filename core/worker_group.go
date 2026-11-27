@@ -135,13 +135,20 @@ func WorkerGroup(
 
 	// Первичное получение кредов — с ретраями, а не один фейл навсегда
 	for attempt := 1; ; attempt++ {
-		if err := fetchCreds(); err == nil {
+		err := fetchCreds()
+		if err == nil {
 			break
-		} else {
-			log.Printf("[ГРУППА #%d] Ошибка кредов (попытка %d): %v", groupID, attempt, err)
+		}
+		log.Printf("[ГРУППА #%d] Ошибка кредов (попытка %d): %v", groupID, attempt, err)
+
+		wait := 5 * time.Second
+		// Если лок CAPTCHA выставился параллельно с запросом, не спамим
+		// повторами каждые 5 секунд — ждём до снятия блока.
+		if remaining := captchaLockoutRemaining(); remaining > 0 {
+			wait = remaining + time.Second
 		}
 		select {
-		case <-time.After(5 * time.Second):
+		case <-time.After(wait):
 		case <-ctx.Done():
 			signalSpawnOnce()
 			return
