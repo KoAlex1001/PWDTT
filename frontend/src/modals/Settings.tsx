@@ -68,25 +68,39 @@ export default function Settings({ onClose }: Props) {
     void saveSplit({ ...settings.splitTunnel, routes, domains, ...patch });
   };
 
-  // Пресет считается включённым, когда все его подсети уже есть в списке.
+  const parseEntries = (text: string) => text.split(/[\n,;]+/).map(s => s.trim()).filter(Boolean);
+
+  // Пресет включён, когда все его подсети и домены уже есть в списках.
   const isPresetActive = (preset: SplitPreset) => {
-    const current = new Set(splitRoutesText.split(/[\n,;]+/).map(s => s.trim()).filter(Boolean));
-    return preset.routes.every(r => current.has(r));
+    const routes = new Set(parseEntries(splitRoutesText));
+    const domains = new Set(parseEntries(splitDomainsText));
+    return preset.routes.every(r => routes.has(r))
+      && (preset.domains ?? []).every(d => domains.has(d));
   };
 
-  // Клик по пресету добавляет его подсети к списку, повторный клик — убирает.
+  // Клик добавляет подсети и домены пресета, повторный клик — убирает.
   const togglePreset = (preset: SplitPreset) => {
-    const current = splitRoutesText.split(/[\n,;]+/).map(s => s.trim()).filter(Boolean);
-    const next = new Set(current);
-    if (isPresetActive(preset)) {
-      preset.routes.forEach(r => next.delete(r));
-    } else {
-      preset.routes.forEach(r => next.add(r));
+    const nextRoutes = new Set(parseEntries(splitRoutesText));
+    const nextDomains = new Set(parseEntries(splitDomainsText));
+    const active = isPresetActive(preset);
+    for (const route of preset.routes) {
+      if (active) nextRoutes.delete(route); else nextRoutes.add(route);
     }
-    const routes = Array.from(next);
-    const domains = splitDomainsText.split(/[\n,;]+/).map(s => s.trim()).filter(Boolean);
+    for (const domain of preset.domains ?? []) {
+      if (active) nextDomains.delete(domain); else nextDomains.add(domain);
+    }
+    const routes = Array.from(nextRoutes);
+    const domains = Array.from(nextDomains);
     setSplitRoutesText(routes.join('\n'));
+    setSplitDomainsText(domains.join('\n'));
     void saveSplit({ ...settings.splitTunnel, routes, domains });
+  };
+
+  const presetHint = (preset: SplitPreset) => {
+    const parts: string[] = [];
+    if (preset.routes.length) parts.push(`${preset.routes.length} подсетей`);
+    if (preset.domains?.length) parts.push(`${preset.domains.length} доменов`);
+    return `${parts.join(', ')} — нажмите, чтобы добавить или убрать`;
   };
 
   useEffect(() => {
@@ -251,7 +265,7 @@ export default function Settings({ onClose }: Props) {
                         key={preset.id}
                         className={`st-preset${isPresetActive(preset) ? ' st-preset--active' : ''}`}
                         onClick={() => togglePreset(preset)}
-                        title={`${preset.routes.length} подсетей — нажмите, чтобы добавить или убрать`}
+                        title={presetHint(preset)}
                       >
                         {preset.label}
                       </button>
