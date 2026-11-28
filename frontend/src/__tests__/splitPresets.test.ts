@@ -21,6 +21,8 @@ describe('SPLIT_PRESETS', () => {
       youtube: '142.250.0.0/15',
       telegram: '91.108.20.0/22',
       ai: 'chatgpt.com',
+      twitch: 'gql.twitch.tv',
+      kick: 'kick.com',
       rutracker: 'rutracker.org',
     };
     for (const [id, entry] of Object.entries(expected)) {
@@ -49,6 +51,26 @@ describe('SPLIT_PRESETS', () => {
       expect(telegram.routes, route).toContain(route);
     }
     expect(telegram.domains).toContain('cdn.telegram.org');
+  });
+
+  it('пресет нейросетей покрывает Google и Cloudflare', () => {
+    const ai = SPLIT_PRESETS.find(p => p.id === 'ai')!;
+    // Gemini уходит на 142.251.x, ChatGPT — на адреса Cloudflare, которые
+    // меняются между подключениями. Одних /32 из доменов недостаточно.
+    for (const route of ['142.250.0.0/15', '104.16.0.0/13', '8.6.112.0/20', '8.47.64.0/20']) {
+      expect(ai.routes, route).toContain(route);
+    }
+    expect(ai.domains).toContain('gemini.google.com');
+  });
+
+  it('пресеты Twitch и Kick покрывают CDN и домены', () => {
+    const twitch = SPLIT_PRESETS.find(p => p.id === 'twitch')!;
+    const kick = SPLIT_PRESETS.find(p => p.id === 'kick')!;
+    expect(twitch.routes).toContain('172.64.0.0/13');
+    expect(twitch.domains).toContain('static-cdn.jtvnw.net');
+    expect(twitch.domains).toContain('irc-ws.chat.twitch.tv');
+    expect(kick.routes).toContain('104.16.0.0/13');
+    expect(kick.domains).toContain('assets.kick.com');
   });
 
   it('id и названия пресетов уникальны', () => {

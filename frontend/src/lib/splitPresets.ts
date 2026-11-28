@@ -13,6 +13,49 @@ export interface SplitPreset {
   domains?: string[];
 }
 
+// Cloudflare-подсети: за CDN работают ChatGPT, Claude, Perplexity, Kick и часть
+// Twitch. Резолв доменов даёт лишь текущие /32-адреса, а CDN меняет их.
+const CLOUDFLARE_ROUTES = [
+  '103.21.244.0/22',
+  '103.22.200.0/22',
+  '103.31.4.0/22',
+  '104.16.0.0/13',
+  '104.24.0.0/14',
+  '108.162.192.0/18',
+  '131.0.72.0/22',
+  '141.101.64.0/18',
+  '162.158.0.0/15',
+  '172.64.0.0/13',
+  '173.245.48.0/20',
+  '188.114.96.0/20',
+  '190.93.240.0/20',
+  '197.234.240.0/22',
+  '198.41.128.0/17',
+  // Сети Cloudflare, через которые OpenAI раздаёт chatgpt.com.
+  '8.6.112.0/20',
+  '8.47.64.0/20',
+];
+
+// Клиентские подсети Google из https://www.gstatic.com/ipranges/goog.json.
+const GOOGLE_ROUTES = [
+  '8.228.0.0/14',
+  '8.232.0.0/14',
+  '8.236.0.0/15',
+  '64.233.160.0/19',
+  '66.102.0.0/20',
+  '72.14.192.0/18',
+  '74.125.0.0/16',
+  '108.177.0.0/17',
+  '142.250.0.0/15',
+  '172.217.0.0/16',
+  '173.194.0.0/16',
+  '192.178.0.0/15',
+  '208.117.224.0/19',
+  '209.85.128.0/17',
+  '216.58.192.0/19',
+  '216.239.32.0/19',
+];
+
 export const SPLIT_PRESETS: SplitPreset[] = [
   {
     id: 'local',
@@ -237,24 +280,7 @@ export const SPLIT_PRESETS: SplitPreset[] = [
     id: 'youtube',
     label: 'YouTube',
     // Клиентские подсети Google из https://www.gstatic.com/ipranges/goog.json.
-    routes: [
-      '8.228.0.0/14',
-      '8.232.0.0/14',
-      '8.236.0.0/15',
-      '64.233.160.0/19',
-      '66.102.0.0/20',
-      '72.14.192.0/18',
-      '74.125.0.0/16',
-      '108.177.0.0/17',
-      '142.250.0.0/15',
-      '172.217.0.0/16',
-      '173.194.0.0/16',
-      '192.178.0.0/15',
-      '208.117.224.0/19',
-      '209.85.128.0/17',
-      '216.58.192.0/19',
-      '216.239.32.0/19',
-    ],
+    routes: [...GOOGLE_ROUTES],
     domains: [
       'youtube.com',
       'www.youtube.com',
@@ -300,16 +326,10 @@ export const SPLIT_PRESETS: SplitPreset[] = [
   {
     id: 'ai',
     label: 'Нейросети',
-    // Большинство сервисов за CDN, поэтому основная часть — домены.
-    // Подсети Google нужны для Gemini и API генерации.
-    routes: [
-      '74.125.0.0/16',
-      '142.250.0.0/15',
-      '172.217.0.0/16',
-      '192.178.0.0/15',
-      '209.85.128.0/17',
-      '216.58.192.0/19',
-    ],
+    // Gemini и API генерации живут в Google, ChatGPT/Claude/Perplexity —
+    // за Cloudflare. Одних доменов мало: браузер часто берёт другой IP CDN,
+    // чем был получен при резолве на момент подключения.
+    routes: [...GOOGLE_ROUTES, ...CLOUDFLARE_ROUTES],
     domains: [
       'chatgpt.com',
       'chat.openai.com',
@@ -336,6 +356,59 @@ export const SPLIT_PRESETS: SplitPreset[] = [
       'perplexity.ai',
       'www.perplexity.ai',
       'api.perplexity.ai',
+    ],
+  },
+  {
+    id: 'twitch',
+    label: 'Twitch',
+    // Собственные подсети Twitch плюс Cloudflare: сайт, API, чат и видеоCDN.
+    routes: [
+      '23.160.0.0/24',
+      '45.113.128.0/22',
+      '52.129.128.0/17',
+      '52.223.192.0/18',
+      '99.181.64.0/18',
+      '103.53.48.0/22',
+      '185.42.204.0/22',
+      '192.16.64.0/21',
+      '192.108.239.0/24',
+      '199.9.248.0/21',
+      ...CLOUDFLARE_ROUTES,
+    ],
+    domains: [
+      'twitch.tv',
+      'www.twitch.tv',
+      'm.twitch.tv',
+      'player.twitch.tv',
+      'assets.twitch.tv',
+      'passport.twitch.tv',
+      'gql.twitch.tv',
+      'api.twitch.tv',
+      'id.twitch.tv',
+      'hermes.twitch.tv',
+      'irc-ws.chat.twitch.tv',
+      'usher.ttvnw.net',
+      'static-cdn.jtvnw.net',
+      'vod-secure.twitch.tv',
+    ],
+  },
+  {
+    id: 'kick',
+    label: 'Kick',
+    // Kick полностью за Cloudflare: подсети CDN плюс домены сайта и видео.
+    routes: [...CLOUDFLARE_ROUTES],
+    domains: [
+      'kick.com',
+      'www.kick.com',
+      'static.kick.com',
+      'assets.kick.com',
+      'id.kick.com',
+      'api.kick.com',
+      'dev.kick.com',
+      'about.kick.com',
+      'help.kick.com',
+      'use.kick.co',
+      'cdn.kick.com',
     ],
   },
   {

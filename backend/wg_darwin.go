@@ -108,9 +108,13 @@ func (w *WG) applyDarwin(confText string, turnIPs []string, split SplitTunnel, d
 		return err
 	}
 
-	shellCmd := fmt.Sprintf("%s --wg-helper -sock %s -addr %s -mtu %d -exclude %s -tunnel %s >/dev/null 2>&1 &",
+	blockIPv6 := ""
+	if needsIPv6Block(split) {
+		blockIPv6 = " -block-ipv6"
+	}
+	shellCmd := fmt.Sprintf("%s --wg-helper -sock %s -addr %s -mtu %d -exclude %s -tunnel %s%s >/dev/null 2>&1 &",
 		shellQuote(exe), shellQuote(sock), shellQuote(addr), mtu,
-		shellQuote(strings.Join(excludes, ",")), shellQuote(strings.Join(tunnels, ",")))
+		shellQuote(strings.Join(excludes, ",")), shellQuote(strings.Join(tunnels, ",")), blockIPv6)
 	osa := fmt.Sprintf("do shell script %q with administrator privileges", shellCmd)
 
 	logf("Запрос прав администратора для настройки туннеля…")
@@ -358,6 +362,7 @@ func RunWGHelperDarwin(args []string) {
 	mtu := fs.Int("mtu", 1300, "MTU")
 	excludes := fs.String("exclude", "", "exclude CIDR через запятую (мимо туннеля)")
 	tunnels := fs.String("tunnel", "", "туннельные CIDR через запятую")
+	blockIPv6 := fs.Bool("block-ipv6", false, "заблокировать IPv6 на время include-туннеля")
 	fs.Parse(args)
 
 	raddr, err := net.ResolveUnixAddr("unix", *sockPath)
@@ -434,6 +439,17 @@ func RunWGHelperDarwin(args []string) {
 		}
 	}
 
+	// IPv4-only туннель: без блокировки IPv6 браузер уйдёт по AAAA мимо VPN.
+	ipv6Blocked := false
+	if *blockIPv6 {
+		if err := runCmdDarwin("route", "-q", "-n", "add", "-inet6", "-blackhole", "default"); err != nil {
+			send(wgHelperMsg{Log: fmt.Sprintf("IPv6 block: %v", err)}, -1)
+		} else {
+			ipv6Blocked = true
+			send(wgHelperMsg{Log: "IPv6 временно заблокирован"}, -1)
+		}
+	}
+
 	// Передаём fd интерфейса приложению
 	send(wgHelperMsg{Name: name}, int(dev.File().Fd()))
 
@@ -447,6 +463,9 @@ func RunWGHelperDarwin(args []string) {
 	}
 	for _, cidr := range added {
 		_ = runCmdDarwin("route", "-q", "-n", "delete", "-net", cidr)
+	}
+	if ipv6Blocked {
+		_ = runCmdDarwin("route", "-q", "-n", "delete", "-inet6", "-blackhole", "default")
 	}
 	runtime.KeepAlive(dev)
 }

@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 
 	"golang.zx2c4.com/wireguard/conn"
 	"golang.zx2c4.com/wireguard/device"
@@ -45,6 +46,8 @@ type WG struct {
 	activeTun           tun.Device
 	activeExcludeRoutes []string
 	physGW              string // physical gateway saved during apply for restore on teardown
+	ipv6Blocked         bool   // IPv6-маршрут в никуда на время include-туннеля
+	ipv6GlobalDisabled  bool   // fallback для Windows, если маршрут добавить не удалось
 
 	// macOS-specific: соединение с привилегированным helper-процессом
 	helperConn *net.UnixConn
@@ -107,6 +110,103 @@ var vkExcludeCIDRs = []string{
 	"95.213.0.0/18", "155.212.192.0/20", "185.16.28.0/22",
 	"194.67.64.0/18", "195.82.146.0/23", "213.180.193.0/24",
 	"77.88.0.0/18", "8.8.8.0/24", "1.1.1.0/24",
+}
+
+// needsIPv6Block: в режиме «Только список» приложение маршрутизирует только
+// IPv4. Без блокировки IPv6 браузер берёт AAAA-адрес сервиса (Google,
+// Cloudflare) и идёт напрямую, мимо VPN — именно так выглядит «пресет не
+// работает» для ChatGPT и Gemini.
+func needsIPv6Block(split SplitTunnel) bool {
+	return split.Enabled && split.Mode == SplitModeInclude
+}
+
+// blockIPv6Include ставит IPv6-маршрут в никуда на время подключения, чтобы
+// системы с IPv6 всё равно использовали IPv4-маршруты через WireGuard.
+func (w *WG) blockIPv6Include(logf wgLogFunc) {
+	var err error
+	switch runtime.GOOS {
+	case "windows":
+		// Маршрут с метрикой 1 на WG-адаптере перехватывает IPv6-дефолт.
+		err = runCmdWindows("netsh", "interface", "ipv6", "add", "route", "::/0", wgIface, "metric=1")
+		if err != nil {
+			// Адаптер может быть без IPv6. Тогда выключаем IPv6 глобально,
+			// но только если он был включён — после отключения вернём обратно.
+			if ipv6GlobalStateWindows() == "enabled" {
+				if err2 := runCmdWindows("netsh", "interface", "ipv6", "set", "global", "state=disabled"); err2 == nil {
+					w.ipv6GlobalDisabled = true
+					err = nil
+				}
+			}
+		} else {
+			w.ipv6Blocked = true
+		}
+	case "linux":
+		err = runCmdLinux("ip", "-6", "route", "add", "blackhole", "default")
+		if err == nil {
+			w.ipv6Blocked = true
+		}
+	default:
+		// На macOS маршрут ставит root-helper (см. -block-ipv6).
+		return
+	}
+	if err != nil {
+		logf(fmt.Sprintf("Не удалось заблокировать IPv6 (трафик по IPv6 может идти мимо туннеля): %v", err))
+		return
+	}
+	logf("IPv6 временно заблокирован: трафик идёт через IPv4-маршруты туннеля")
+}
+
+// ipv6GlobalStateWindows читает состояние IPv6 из `netsh interface ipv6 show global`.
+func ipv6GlobalStateWindows() string {
+	cmd := exec.Command("netsh", "interface", "ipv6", "show", "global")
+	hideWindow(cmd)
+	out, err := cmd.Output()
+	if err != nil {
+		return ""
+	}
+	for _, line := range strings.Split(string(out), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 3 || fields[1] != ":" {
+			continue
+		}
+		if !strings.EqualFold(fields[0], "State") && !strings.EqualFold(fields[0], "Состояние") {
+			continue
+		}
+		val := strings.ToLower(fields[2])
+		switch val {
+		case "enabled", "включено":
+			return "enabled"
+		case "disabled", "отключено":
+			return "disabled"
+		}
+	}
+	return ""
+}
+
+// unblockIPv6 снимает маршрут, поставленный blockIPv6Include.
+func (w *WG) unblockIPv6(logf wgLogFunc) {
+	if !w.ipv6Blocked && !w.ipv6GlobalDisabled {
+		return
+	}
+	var err error
+	switch runtime.GOOS {
+	case "windows":
+		if w.ipv6Blocked {
+			err = runCmdWindows("netsh", "interface", "ipv6", "delete", "route", "::/0", wgIface)
+		}
+		if w.ipv6GlobalDisabled {
+			if err2 := runCmdWindows("netsh", "interface", "ipv6", "set", "global", "state=enabled"); err2 != nil && err == nil {
+				err = err2
+			}
+		}
+	case "linux":
+		err = runCmdLinux("ip", "-6", "route", "del", "blackhole", "default")
+	}
+	if err != nil && logf != nil {
+		logf(fmt.Sprintf("Не удалось снять блокировку IPv6: %v", err))
+	}
+	w.ipv6Blocked = false
+	w.ipv6GlobalDisabled = false
 }
 
 func parseWGConfig(conf string) (addr, mtu string, allowedIPs []string, wgConf string) {
@@ -222,6 +322,9 @@ func (w *WG) applyLinux(conf string, turnIPs []string, split SplitTunnel, domain
 			routes = append(routes, "dev:"+cidr)
 		}
 	}
+	if needsIPv6Block(split) {
+		w.blockIPv6Include(logf)
+	}
 
 	w.activeRoutesMu.Lock()
 	w.activeRoutes = routes
@@ -242,6 +345,7 @@ func (w *WG) teardownLinux() {
 			_ = runCmdLinux("ip", "route", "del", entry)
 		}
 	}
+	w.unblockIPv6(nil)
 	_ = runCmdLinux("ip", "link", "del", wgIface)
 }
 
@@ -322,11 +426,25 @@ func (w *WG) applyWindows(conf string, turnIPs []string, split SplitTunnel, doma
 		fmt.Sscanf(mtuStr, "%d", &mtu)
 	}
 
-	// Create wintun TUN interface
+	// Create wintun TUN interface.
+	// Wintun ждёт появления сетевого интерфейса Limited to 15 seconds; на некоторых
+	// системах device query не успевает сработать с первого раза. Повторяем, чтобы
+	// соединение не падало из-за этой временной заминки PnP.
 	logf(fmt.Sprintf("Создание TUN интерфейса %q (mtu=%d)", wgIface, mtu))
-	tunDev, err := tun.CreateTUN(wgIface, mtu)
-	if err != nil {
-		return fmt.Errorf("create TUN: %w", err)
+	var tunDev tun.Device
+	var tunErr error
+	for attempt := 1; attempt <= 3; attempt++ {
+		tunDev, tunErr = tun.CreateTUN(wgIface, mtu)
+		if tunErr == nil {
+			break
+		}
+		logf(fmt.Sprintf("Не удалось создать TUN интерфейс (попытка %d/3): %v", attempt, tunErr))
+		if attempt < 3 {
+			time.Sleep(time.Duration(attempt) * 2 * time.Second)
+		}
+	}
+	if tunErr != nil {
+		return fmt.Errorf("create TUN: %w", tunErr)
 	}
 	w.activeTun = tunDev
 
@@ -406,6 +524,9 @@ func (w *WG) applyWindows(conf string, turnIPs []string, split SplitTunnel, doma
 		tunnelRoutes = append(tunnelRoutes, cidr)
 	}
 	w.activeRoutes = tunnelRoutes
+	if needsIPv6Block(split) {
+		w.blockIPv6Include(logf)
+	}
 
 	logf(fmt.Sprintf("Туннель %s поднят, AllowedIPs: %v", wgIface, tunnelRoutes))
 	return nil
@@ -427,6 +548,7 @@ func (w *WG) teardownWindowsLocked() {
 		_ = runCmdWindows("route", "change", "0.0.0.0", "mask", "0.0.0.0", w.physGW, "metric", "35")
 		w.physGW = ""
 	}
+	w.unblockIPv6(nil)
 
 	// Delete exclude routes
 	for _, cidr := range w.activeExcludeRoutes {
